@@ -19,10 +19,39 @@ def get_all_links(url):
 
     for link in soup.find_all('a'):
         href = link.get('href')
-        if href and href.startswith('https://ans-gniezno.edu.pl/wp-content/'):
+        if href and href.startswith('https://ans-gniezno.edu.pl/wp-content/') and 'wykaz-tygodni' not in href:
             links.append(href)
 
     return links
+
+def download_and_update_files(links, output_dir):
+    existing_files = set(os.listdir(output_dir))
+
+    # Usuń pliki lokalne, których nie ma na liście linków
+    for local_file in existing_files:
+        local_file_path = os.path.join(output_dir, local_file)
+        if local_file not in [os.path.basename(link) for link in links]:
+            os.remove(local_file_path)
+            print("Usunięto nieaktualny plik:", local_file_path)
+
+    # Pobierz lub zaktualizuj pliki zgodnie z listą linków
+    for link in links:
+        response = requests.get(link, verify=False)
+        if response.status_code == 200:
+            file_name = os.path.basename(link)
+            file_path = os.path.join(output_dir, file_name)
+
+            # Sprawdź, czy plik jest aktualny
+            if os.path.exists(file_path) and file_name == os.path.basename(file_path):
+                print("Plik PDF jest już aktualny:", link)
+            else:
+                # Pobierz nowy plik lub zaktualizuj istniejący
+                with open(file_path, 'wb') as f:
+                    f.write(response.content)
+                if os.path.exists(file_path):
+                    print("Plik PDF został zaktualizowany:", link)
+                else:
+                    print("Plik PDF został pobrany:", link)
 
 url = 'https://ans-gniezno.edu.pl/studenci/plany-zajec/'
 links = get_all_links(url)
@@ -30,12 +59,4 @@ links = get_all_links(url)
 output_dir = destination_path_pdf
 create_directory_if_not_exists(output_dir)
 
-for link in links:
-    response = requests.get(link, verify=False)
-    if response.status_code == 200:
-        file_path = os.path.join(output_dir, os.path.basename(link))
-        with open(file_path, 'wb') as f:
-            f.write(response.content)
-        print("Plik PDF został pobrany:", link)
-    else:
-        print(f"Nie udało się pobrać pliku PDF: {link}")
+download_and_update_files(links, output_dir)
